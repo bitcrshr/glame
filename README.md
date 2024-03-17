@@ -1,4 +1,4 @@
-# glame
+# 🎮 glame
 
 A client implementation of the [RCON Protocol](https://developer.valvesoftware.com/wiki/Source_RCON_Protocol),
 inpsired by [gorcon](https://github.com/gorcon/rcon).
