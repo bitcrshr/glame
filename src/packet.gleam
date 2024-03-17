@@ -1,6 +1,6 @@
 import gleam/string
 import gleam/bytes_builder
-import gleam/io
+import errors
 
 /// How many bytes the padding (i.e., <<0x00, 0x00>>) takes up
 pub const packet_padding_size_bytes: Int = 2
@@ -49,15 +49,13 @@ pub fn new(
   packet_type: PacketType,
   packet_id: Int,
   body: String,
-) -> Result(Packet, String) {
-  let size =
-    string.byte_size(body)
-    + packet_header_size_bytes
-    + packet_padding_size_bytes
+) -> Result(Packet, errors.Error) {
+  let body_size = string.byte_size(body)
+  let size = body_size + packet_header_size_bytes + packet_padding_size_bytes
   let max = max_packet_size_bytes()
 
   case size {
-    _ if size > max -> Error("body is larger than 4096 bytes")
+    _ if size > max -> Error(errors.BodyTooLarge(body_size))
     _ -> {
       let bytes =
         body
@@ -70,20 +68,15 @@ pub fn new(
 }
 
 /// Constructs a {Packet} from a {BitArray}
-pub fn from_bytes(bytes: BitArray) -> Result(Packet, String) {
+pub fn from_bytes(bytes: BitArray) -> Result(Packet, errors.Error) {
   let min_ps = min_packet_size_bytes()
-  let max_ps = max_packet_size_bytes()
-
-  io.debug(bytes)
 
   case bytes {
     <<size:size(32)-little-int, rest:bits>> -> {
       case size {
         _ if size < min_ps -> {
-          Error("size cannot be less than min_packet_size")
+          Error(errors.PacketSizeTooSmall(bytes, size))
         }
-        _ if size > max_ps ->
-          Error("size cannot be greater than max_packet_size")
         _ -> {
           let body_size_bits =
             { size - packet_header_size_bytes - packet_padding_size_bytes } * 8
@@ -93,32 +86,27 @@ pub fn from_bytes(bytes: BitArray) -> Result(Packet, String) {
               id:int-size(32)-little,
               typ:int-size(32)-little,
               body:size(body_size_bits)-bits,
-              padding:size(16)-bits,
+              0,
+              0,
             >> -> {
               case typ {
                 3 | 2 | 0 -> {
-                  case padding {
-                    <<0x00, 0x00>> -> {
-                      Ok(Packet(size, id, typ, body))
-                    }
-
-                    _ -> Error("padding must be <<0x00, 0x00>>")
-                  }
+                  Ok(Packet(size, id, typ, body))
                 }
 
-                _ -> Error("type must be 3, 2, or 0")
+                _ -> Error(errors.InvalidPacketType(bytes, typ))
               }
             }
 
             _ -> {
-              Error("invalid packet format")
+              Error(errors.InvalidPacketStructure(bytes))
             }
           }
         }
       }
     }
 
-    _ -> Error("invalid packet format")
+    _ -> Error(errors.InvalidPacketStructure(bytes))
   }
 }
 

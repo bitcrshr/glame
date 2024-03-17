@@ -3,6 +3,7 @@ import gleam/bit_array
 import mug
 import birl/duration
 import packet
+import errors
 
 pub type Connection {
   Connection(sock: mug.Socket)
@@ -12,7 +13,7 @@ pub fn dial(
   host: String,
   port: Int,
   password: String,
-) -> Result(Connection, String) {
+) -> Result(Connection, errors.Error) {
   let sock_result =
     mug.new(host, port)
     |> mug.connect()
@@ -28,15 +29,15 @@ pub fn dial(
       }
     }
 
-    Error(e) -> Error(string.inspect(e))
+    Error(e) -> Error(errors.SocketError(e))
   }
 }
 
-pub fn execute(conn: Connection, cmd: String) -> Result(String, String) {
+pub fn execute(conn: Connection, cmd: String) -> Result(String, errors.Error) {
   let cmd_len = string.length(cmd)
   case cmd_len {
-    0 -> Error("cmd cannot be empty")
-    _ if cmd_len > 4096 -> Error("cmd cannot be larger than 4096 bytes")
+    0 -> Error(errors.BodyEmpty)
+    _ if cmd_len > 4096 -> Error(errors.BodyTooLarge(cmd_len))
     _ -> {
       case write(conn, packet.ServerDataExecCommand, 3, cmd) {
         Ok(_) -> {
@@ -45,7 +46,7 @@ pub fn execute(conn: Connection, cmd: String) -> Result(String, String) {
               case bit_array.to_string(pkt.body) {
                 Ok(body) -> Ok(body)
 
-                Error(_) -> Error("failed to read body as string")
+                Error(_) -> Error(errors.BodyNotUTF8(pkt.body))
               }
             }
 
@@ -59,35 +60,27 @@ pub fn execute(conn: Connection, cmd: String) -> Result(String, String) {
   }
 }
 
-fn auth(conn: Connection, password: String) -> Result(Nil, String) {
+fn auth(conn: Connection, password: String) -> Result(Nil, errors.Error) {
   case write(conn, packet.ServerDataAuth, 2, password) {
     Ok(_) -> {
       case read(conn) {
         Ok(pkt) -> {
-          let size = pkt.size - packet.packet_header_size_bytes
+          case pkt.typ {
+            0 -> {
+              // Some servers will send an empty SERVERDATA_RESPONSE_VALUE packet
+              // immediately followed by an auth response, so we need to discard the first
+              // packet if necessary
+              case read(conn) {
+                Ok(p) -> {
+                  validate_auth_response(p, 2)
+                }
 
-          case size {
-            _ if size < 0 -> {
-              Error("Invalid")
+                Error(e) -> Error(e)
+              }
             }
 
             _ -> {
-              case pkt.typ {
-                0 -> {
-                  // SERVERDATA_RESPONSE_VALUE
-                  case read(conn) {
-                    Ok(p) -> {
-                      validate_auth_response(p, 2)
-                    }
-
-                    Error(e) -> Error(e)
-                  }
-                }
-
-                _ -> {
-                  validate_auth_response(pkt, 2)
-                }
-              }
+              validate_auth_response(pkt, 2)
             }
           }
         }
@@ -103,27 +96,17 @@ fn auth(conn: Connection, password: String) -> Result(Nil, String) {
 fn validate_auth_response(
   pkt: packet.Packet,
   auth_id: Int,
-) -> Result(Nil, String) {
+) -> Result(Nil, errors.Error) {
   case pkt.typ {
     2 -> {
       case pkt.id {
-        -1 -> Error("auth failed")
+        -1 -> Error(errors.AuthFailed)
         _ if pkt.id == auth_id -> Ok(Nil)
-        got ->
-          Error(
-            "invalid auth packet response id. wanted 2, got "
-            <> string.inspect(got),
-          )
+        got -> Error(errors.WrongResponseId(auth_id, got))
       }
     }
 
-    got ->
-      Error(
-        "auth response had wrong type. wanted"
-        <> string.inspect(auth_id)
-        <> ", got "
-        <> string.inspect(got),
-      )
+    got -> Error(errors.WrongResponseType(2, got))
   }
 }
 
@@ -132,14 +115,14 @@ fn write(
   packet_type: packet.PacketType,
   packet_id: Int,
   cmd: String,
-) -> Result(Nil, String) {
+) -> Result(Nil, errors.Error) {
   case packet.new(packet_type, packet_id, cmd) {
     Ok(pkt) -> {
       let bytes = packet.to_bytes(pkt)
 
       case mug.send(conn.sock, bytes) {
         Ok(_) -> Ok(Nil)
-        Error(e) -> Error(string.inspect(e))
+        Error(e) -> Error(errors.SocketError(e))
       }
     }
 
@@ -147,13 +130,13 @@ fn write(
   }
 }
 
-fn read(conn: Connection) -> Result(packet.Packet, String) {
+fn read(conn: Connection) -> Result(packet.Packet, errors.Error) {
   case mug.receive(conn.sock, default_timeout()) {
     Ok(bytes) -> {
       packet.from_bytes(bytes)
     }
 
-    Error(e) -> Error(string.inspect(e))
+    Error(e) -> Error(errors.SocketError(e))
   }
 }
 
