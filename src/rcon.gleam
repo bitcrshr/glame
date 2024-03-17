@@ -1,26 +1,32 @@
 import gleam/string
 import gleam/bit_array
 import mug
-import birl/duration
 import packet
 import errors
+import gleam/option
+
+const default_timeout_ms = 5000
 
 pub type Connection {
-  Connection(sock: mug.Socket)
+  Connection(sock: mug.Socket, timeout_ms: Int)
 }
 
 pub fn dial(
   host: String,
   port: Int,
   password: String,
+  connect_timeout_ms: option.Option(Int),
+  rw_timeout_ms: option.Option(Int),
 ) -> Result(Connection, errors.Error) {
   let sock_result =
     mug.new(host, port)
+    |> mug.timeout(option.unwrap(connect_timeout_ms, default_timeout_ms))
     |> mug.connect()
 
   case sock_result {
     Ok(sock) -> {
-      let conn = Connection(sock)
+      let conn =
+        Connection(sock, option.unwrap(rw_timeout_ms, default_timeout_ms))
 
       case auth(conn, password) {
         Ok(_) -> Ok(conn)
@@ -131,16 +137,11 @@ fn write(
 }
 
 fn read(conn: Connection) -> Result(packet.Packet, errors.Error) {
-  case mug.receive(conn.sock, default_timeout()) {
+  case mug.receive(conn.sock, conn.timeout_ms) {
     Ok(bytes) -> {
       packet.from_bytes(bytes)
     }
 
     Error(e) -> Error(errors.SocketError(e))
   }
-}
-
-fn default_timeout() -> Int {
-  duration.seconds(5)
-  |> duration.blur_to(duration.MilliSecond)
 }
