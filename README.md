@@ -1,5 +1,9 @@
 # glame 🎮
 
+[![Package Version](https://img.shields.io/hexpm/v/glame)](https://hex.pm/packages/glame)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/glame/)
+
+
 A client implementation of the [Source RCON Protocol](https://developer.valvesoftware.com/wiki/Source_RCON_Protocol),
 inpsired by [gorcon](https://github.com/gorcon/rcon).
 
