@@ -1,8 +1,8 @@
 import gleam/string
 import gleam/bit_array
 import mug
-import packet
-import errors
+import glame/packet
+import glame/errors
 import gleam/option
 
 /// The default timeout used for connecting, reading, and writing to the socket

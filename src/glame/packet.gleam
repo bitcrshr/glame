@@ -1,6 +1,6 @@
 import gleam/string
 import gleam/bytes_builder
-import errors
+import glame/errors
 
 /// How many bytes the padding (i.e., <<0x00, 0x00>>) takes up
 pub const packet_padding_size_bytes: Int = 2
