@@ -5,12 +5,15 @@ import packet
 import errors
 import gleam/option
 
+/// The default timeout used for connecting, reading, and writing to the socket
 const default_timeout_ms = 5000
 
+/// Thin wrapper over a TCP socket
 pub type Connection {
   Connection(sock: mug.Socket, timeout_ms: Int)
 }
 
+/// Connects to the TCP socket and auths with the RCON server
 pub fn dial(
   host: String,
   port: Int,
@@ -39,6 +42,7 @@ pub fn dial(
   }
 }
 
+/// Executes a command on the RCON server
 pub fn execute(conn: Connection, cmd: String) -> Result(String, errors.Error) {
   let cmd_len = string.length(cmd)
   case cmd_len {
@@ -66,6 +70,7 @@ pub fn execute(conn: Connection, cmd: String) -> Result(String, errors.Error) {
   }
 }
 
+/// Authorizes the connection with the RCON server
 fn auth(conn: Connection, password: String) -> Result(Nil, errors.Error) {
   case write(conn, packet.ServerDataAuth, 2, password) {
     Ok(_) -> {
@@ -99,6 +104,7 @@ fn auth(conn: Connection, password: String) -> Result(Nil, errors.Error) {
   }
 }
 
+/// Makes sure that authentication was successful
 fn validate_auth_response(
   pkt: packet.Packet,
   auth_id: Int,
@@ -116,6 +122,7 @@ fn validate_auth_response(
   }
 }
 
+/// Sends a packet to the server
 fn write(
   conn: Connection,
   packet_type: packet.PacketType,
@@ -136,6 +143,7 @@ fn write(
   }
 }
 
+/// Waits to receive a packet from the server
 fn read(conn: Connection) -> Result(packet.Packet, errors.Error) {
   case mug.receive(conn.sock, conn.timeout_ms) {
     Ok(bytes) -> {
