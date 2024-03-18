@@ -18,6 +18,7 @@ pub fn max_packet_size_bytes() -> Int {
   4096 + min_packet_size_bytes()
 }
 
+/// Represents an RCON packet
 pub type Packet {
   Packet(size: Int, id: Int, typ: Int, body: BitArray)
 }
@@ -37,6 +38,7 @@ pub type PacketType {
   ServerDataResponseValue
 }
 
+/// Converts a {PacketType} to its integer representation.
 pub fn packet_type_to_int(pt: PacketType) -> Int {
   case pt {
     ServerDataAuth -> 3
@@ -45,6 +47,7 @@ pub fn packet_type_to_int(pt: PacketType) -> Int {
   }
 }
 
+/// Constructs a new {Packet}
 pub fn new(
   packet_type: PacketType,
   packet_id: Int,
@@ -110,6 +113,7 @@ pub fn from_bytes(bytes: BitArray) -> Result(Packet, errors.Error) {
   }
 }
 
+/// Serializes a {Packet} to a {BitArray}
 pub fn to_bytes(packet: Packet) -> BitArray {
   bytes_builder.new()
   |> bytes_builder.append(<<packet.size:int-size(32)-little>>)
