@@ -4,9 +4,9 @@ version = "1.0.0"
 # Fill out these fields if you intend to generate HTML documentation or publish
 # your project to the Hex package manager.
 #
-# description = ""
-# licences = ["Apache-2.0"]
-# repository = { type = "github", user = "username", repo = "project" }
+description = "A Source RCON Client implementation"
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "bitcrshr", repo = "glame" }
 # links = [{ title = "Website", href = "https://gleam.run" }]
 #
 # For a full reference of all the available options, you can have a look at
@@ -15,7 +15,6 @@ version = "1.0.0"
 [dependencies]
 gleam_stdlib = "~> 0.34 or ~> 1.0"
 mug = "~> 1.0"
-birl = "~> 1.5"
 
 [dev-dependencies]
 gleeunit = "~> 1.0"
